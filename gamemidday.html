@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>มิดเดกินกระดูก</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+body { margin:0; overflow:hidden; font-family:Kanit,sans-serif;}
+.game-bg {
+  background: linear-gradient(180deg,#87CEEB 0%,#E0F6FF 10%,#FFFFFF 100%);
+}
+.character-box{
+  width:120px;height:120px;
+  display:flex;align-items:center;justify-content:center;
+  background:white;border-radius:16px;
+}
+.character-box img{
+  width:100%;height:100%;object-fit:contain;
+}
+.falling-item{
+  position:absolute;font-size:3rem;
+  animation:fall linear forwards;
+}
+@keyframes fall{
+  from{transform:translateY(-100px);}
+  to{transform:translateY(100vh);}
+}
+.mobile-btn{
+  width:70px;height:70px;
+  background:white;border-radius:50%;
+  font-size:2rem;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 10px rgba(0,0,0,0.2);
+}
+.hidden{display:none;}
+</style>
+</head>
+
+<body>
+
+<!-- หน้าเริ่ม -->
+<div id="startScreen" class="h-screen game-bg flex flex-col items-center justify-center">
+  <h1 class="text-3xl mb-6">🦴 มิดเดกินกระดูก 🦴</h1>
+
+  <img src="https://hosting.photobucket.com/84a6e686-70ef-47aa-a209-1911d0837be9/4c3f4e5b-af39-4793-b884-c118ebd39df0.png?width=200&height=200&fit=bounds&agent-check=true" width="150" class="mb-6">
+
+  <button onclick="startGame()"
+    class="bg-pink-500 text-white px-6 py-3 rounded-xl">
+    เริ่มเกม
+  </button>
+</div>
+
+<!-- เกม -->
+<div id="game" class="hidden h-screen game-bg relative">
+
+  <div class="absolute top-4 left-4 bg-white px-4 py-2 rounded-xl">
+    🦴 <span id="score">0</span>
+  </div>
+
+  <div id="area" class="absolute inset-0"></div>
+
+  <div id="player" class="absolute bottom-24 left-1/2 -translate-x-1/2">
+    <div id="face-normal" class="character-box">
+      <img src="https://hosting.photobucket.com/84a6e686-70ef-47aa-a209-1911d0837be9/4c3f4e5b-af39-4793-b884-c118ebd39df0.png?width=200&height=200&fit=bounds&agent-check=true">
+    </div>
+    <div id="face-eat" class="character-box hidden">
+      <img src="https://hosting.photobucket.com/84a6e686-70ef-47aa-a209-1911d0837be9/30815c5e-2d4a-47a3-b455-baa7e02497a7.png?width=200&height=200&fit=bounds&agent-check=true">
+    </div>
+  </div>
+
+  <!-- ปุ่มมือถือ -->
+  <div class="absolute bottom-4 left-0 right-0 flex justify-between px-10 md:hidden">
+    <div id="leftBtn" class="mobile-btn">◀</div>
+    <div id="rightBtn" class="mobile-btn">▶</div>
+  </div>
+
+</div>
+
+<!-- เกมจบ -->
+<div id="over" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center">
+  <div class="bg-white p-8 rounded-xl text-center">
+    <h2 class="text-2xl mb-4">เกมจบ!</h2>
+    <p>คะแนน: <span id="final"></span></p>
+    <button onclick="resetGame()" class="bg-pink-500 text-white px-4 py-2 rounded mt-4">
+      เล่นอีกครั้ง
+    </button>
+  </div>
+</div>
+
+<script>
+
+let score=0;
+let x=50;
+let gameOn=false;
+let items=[];
+let keys={};
+let eatTimer;
+let loop, spawn;
+
+// เริ่มเกม
+function startGame(){
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("game").classList.remove("hidden");
+
+  score=0;
+  x=50;
+  gameOn=true;
+  items=[];
+  document.getElementById("score").textContent=0;
+  document.getElementById("area").innerHTML="";
+
+  loop=setInterval(update,16);
+  spawn=setInterval(createItem,800);
+}
+
+// สร้างของตก
+function createItem(){
+  if(!gameOn) return;
+
+  const area=document.getElementById("area");
+  const good=Math.random()>0.3;
+
+  const item=document.createElement("div");
+  item.className="falling-item";
+  item.style.left=Math.random()*90+"%";
+  item.style.animationDuration="3s";
+  item.textContent=good?"🦴":"💩";
+  item.dataset.type=good?"good":"bad";
+
+  area.appendChild(item);
+  items.push(item);
+}
+
+// อัปเดตเกม
+function update(){
+  if(keys["left"]) x=Math.max(10,x-3);
+  if(keys["right"]) x=Math.min(90,x+3);
+
+  document.getElementById("player").style.left=`calc(${x}% - 60px)`;
+
+  checkHit();
+}
+
+// ตรวจชน
+function checkHit(){
+  const player=document.getElementById("player").getBoundingClientRect();
+
+  items=items.filter(i=>{
+    const r=i.getBoundingClientRect();
+
+    if(r.top>window.innerHeight){
+      i.remove();
+      return false;
+    }
+
+    if(!(player.right<r.left||player.left>r.right||player.bottom<r.top||player.top>r.bottom)){
+
+      if(i.dataset.type==="good"){
+        score+=10;
+        document.getElementById("score").textContent=score;
+        eatEffect();
+      }else{
+        endGame();
+      }
+
+      i.remove();
+      return false;
+    }
+    return true;
+  });
+}
+
+// เอฟเฟกต์กิน
+function eatEffect(){
+  const normal=document.getElementById("face-normal");
+  const eat=document.getElementById("face-eat");
+
+  normal.classList.add("hidden");
+  eat.classList.remove("hidden");
+
+  clearTimeout(eatTimer);
+  eatTimer=setTimeout(()=>{
+    eat.classList.add("hidden");
+    normal.classList.remove("hidden");
+  },400);
+}
+
+// จบเกม
+function endGame(){
+  gameOn=false;
+  clearInterval(loop);
+  clearInterval(spawn);
+  document.getElementById("final").textContent=score;
+  document.getElementById("over").classList.remove("hidden");
+}
+
+// รีเซ็ต
+function resetGame(){
+  document.getElementById("over").classList.add("hidden");
+  document.getElementById("game").classList.add("hidden");
+  document.getElementById("startScreen").classList.remove("hidden");
+}
+
+// คีย์บอร์ด
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft") keys["left"]=true;
+  if(e.key==="ArrowRight") keys["right"]=true;
+});
+document.addEventListener("keyup",e=>{
+  if(e.key==="ArrowLeft") keys["left"]=false;
+  if(e.key==="ArrowRight") keys["right"]=false;
+});
+
+// ปุ่มมือถือ
+const L=document.getElementById("leftBtn");
+const R=document.getElementById("rightBtn");
+
+["mousedown","touchstart"].forEach(ev=>{
+  L.addEventListener(ev,()=>keys["left"]=true);
+  R.addEventListener(ev,()=>keys["right"]=true);
+});
+["mouseup","mouseleave","touchend","touchcancel"].forEach(ev=>{
+  L.addEventListener(ev,()=>keys["left"]=false);
+  R.addEventListener(ev,()=>keys["right"]=false);
+});
+
+</script>
+</body>
+</html>
