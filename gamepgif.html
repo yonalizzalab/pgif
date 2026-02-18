@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เกมพี่กิฟกินข้าว</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+body{margin:0;overflow:hidden;font-family:Kanit,sans-serif;}
+.game-bg{
+  background:linear-gradient(180deg,#000000 0%,#000000 20%,#000000 100%);
+}
+.character-box{
+  width:120px;height:120px;
+  display:flex;align-items:center;justify-content:center;
+  background:black;border-radius:20px;
+  box-shadow:0 6px 12px rgba(0,0,0,0.15);
+}
+.character-box img{
+  width:100%;height:100%;object-fit:contain;
+}
+.falling-item{
+  position:absolute;
+  font-size:3rem;
+  animation:fall linear forwards;
+}
+@keyframes fall{
+  from{transform:translateY(-120px);}
+  to{transform:translateY(100vh);}
+}
+.hidden{display:none;}
+</style>
+</head>
+
+<body>
+
+<!-- หน้าเริ่ม -->
+<div id="startScreen" class="h-screen game-bg flex flex-col items-center justify-center">
+  <h1 class="text-3xl mb-6 text-white">เกมพี่กิฟกินข้าว</h1>
+  <button onclick="startGame()" class="bg-yellow-500 text-white px-6 py-3 rounded-xl">
+    เริ่มเกม
+  </button>
+</div>
+
+<!-- เกม -->
+<div id="game" class="hidden h-screen game-bg relative">
+
+  <div class="absolute top-4 left-4 bg-white px-4 py-2 rounded-xl">
+    🍔 คะแนน: <span id="score">0</span>
+  </div>
+
+  <div class="absolute top-4 right-4 bg-yellow-400 px-4 py-2 rounded-xl font-bold">
+    ⭐ Level: <span id="level">1</span>
+  </div>
+
+  <div id="area" class="absolute inset-0"></div>
+
+  <div id="player" class="absolute bottom-24 left-1/2 -translate-x-1/2">
+    <div id="face-normal" class="character-box">
+      <img src="https://hosting.photobucket.com/84a6e686-70ef-47aa-a209-1911d0837be9/135ab164-c437-454e-9845-5390886ecfc3.png?width=200&height=200&fit=bounds&agent-check=true">
+    </div>
+    <div id="face-eat" class="character-box hidden">
+      <img src="https://hosting.photobucket.com/84a6e686-70ef-47aa-a209-1911d0837be9/33560192-4c9f-439e-beab-99ee57309f84.png?width=200&height=200&fit=bounds&agent-check=true">
+    </div>
+  </div>
+
+</div>
+
+<!-- เกมจบ -->
+<div id="over" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center">
+  <div class="bg-white p-8 rounded-xl text-center">
+    <h2 class="text-2xl mb-4">พี่กิ๊บเมา🍺</h2>
+    <p>คะแนนรวม: <span id="final"></span></p>
+    <button onclick="resetGame()" class="bg-pink-500 text-white px-4 py-2 rounded mt-4">
+      เล่นใหม่
+    </button>
+  </div>
+</div>
+
+<script>
+
+let score=0;
+let level=1;
+let x=50;
+let targetX=50;
+let gameOn=false;
+let items=[];
+let keys={};
+let loop,spawn,eatTimer;
+
+const goodItems=["🍣","🍔","🧋"];
+const badItems=["🍺"];
+
+function startGame(){
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("game").classList.remove("hidden");
+
+  score=0;
+  level=1;
+  x=50;
+  targetX=50;
+  gameOn=true;
+  items=[];
+  keys={};
+
+  document.getElementById("score").textContent=0;
+  document.getElementById("level").textContent=1;
+  document.getElementById("area").innerHTML="";
+
+  loop=setInterval(update,16);
+  spawn=setInterval(createItem,800);
+}
+
+function updateLevel(){
+  let newLevel=Math.min(8,Math.floor(score/500)+1);
+  if(newLevel!==level){
+    level=newLevel;
+    document.getElementById("level").textContent=level;
+  }
+}
+
+function createItem(){
+  if(!gameOn) return;
+
+  const area=document.getElementById("area");
+  const isGood=Math.random()>0.3;
+
+  const item=document.createElement("div");
+  item.className="falling-item";
+  item.style.left=Math.random()*90+"%";
+
+  let duration=3 - (level-1)*0.25;
+  item.style.animationDuration=duration+"s";
+
+  if(isGood){
+    item.textContent=goodItems[Math.floor(Math.random()*goodItems.length)];
+    item.dataset.type="good";
+  }else{
+    item.textContent=badItems[0];
+    item.dataset.type="bad";
+  }
+
+  area.appendChild(item);
+  items.push(item);
+}
+
+function update(){
+
+  // คีย์บอร์ด
+  if(keys["left"]) targetX=Math.max(10,targetX-3);
+  if(keys["right"]) targetX=Math.min(90,targetX+3);
+
+  // Smooth movement
+  x += (targetX - x) * 0.35;
+
+  document.getElementById("player").style.left=`calc(${x}% - 60px)`;
+
+  checkHit();
+}
+
+function checkHit(){
+  const player=document.getElementById("player").getBoundingClientRect();
+
+  items=items.filter(i=>{
+    const r=i.getBoundingClientRect();
+
+    if(r.top>window.innerHeight){
+      i.remove();
+      return false;
+    }
+
+    if(!(player.right<r.left||player.left>r.right||player.bottom<r.top||player.top>r.bottom)){
+      if(i.dataset.type==="good"){
+        score+=10;
+        document.getElementById("score").textContent=score;
+        updateLevel();
+        eatEffect();
+      }else{
+        endGame();
+      }
+      i.remove();
+      return false;
+    }
+    return true;
+  });
+}
+
+function eatEffect(){
+  const normal=document.getElementById("face-normal");
+  const eat=document.getElementById("face-eat");
+
+  normal.classList.add("hidden");
+  eat.classList.remove("hidden");
+
+  clearTimeout(eatTimer);
+  eatTimer=setTimeout(()=>{
+    eat.classList.add("hidden");
+    normal.classList.remove("hidden");
+  },300);
+}
+
+function endGame(){
+  gameOn=false;
+  clearInterval(loop);
+  clearInterval(spawn);
+  document.getElementById("final").textContent=score;
+  document.getElementById("over").classList.remove("hidden");
+}
+
+function resetGame(){
+  document.getElementById("over").classList.add("hidden");
+  document.getElementById("game").classList.add("hidden");
+  document.getElementById("startScreen").classList.remove("hidden");
+}
+
+// Keyboard
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft") keys["left"]=true;
+  if(e.key==="ArrowRight") keys["right"]=true;
+});
+document.addEventListener("keyup",e=>{
+  if(e.key==="ArrowLeft") keys["left"]=false;
+  if(e.key==="ArrowRight") keys["right"]=false;
+});
+
+// Touch Smooth Drag
+const gameArea=document.getElementById("game");
+
+gameArea.addEventListener("touchstart",handleTouch);
+gameArea.addEventListener("touchmove",handleTouch);
+
+function handleTouch(e){
+  if(!gameOn) return;
+  const touch=e.touches[0];
+  const percent=(touch.clientX/window.innerWidth)*100;
+  targetX=Math.max(10,Math.min(90,percent));
+}
+
+</script>
+
+
+<script src="https://static.app/js/static.js" type="text/javascript"></script>
+</body>
+</html>
